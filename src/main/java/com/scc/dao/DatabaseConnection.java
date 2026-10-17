@@ -105,6 +105,16 @@ public class DatabaseConnection {
                 (2, 'Brake Fluid & Brake Shoes', 'Good'),
                 (3, 'Tire Pressure & Tread', 'Needs Check');
             """);
+            stmt.execute("""
+    CREATE TABLE IF NOT EXISTS audit_logs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        event_type TEXT NOT NULL,
+        description TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id)
+    );
+""");
 
         } catch (SQLException e) {
             System.err.println("Database Initialization Error: " + e.getMessage());
