@@ -7,53 +7,35 @@ import java.util.List;
 
 public class UserDao {
 
-    public boolean registerUser(String username, String password, String role) {
-        String sql = "INSERT INTO users(username, password, roles, status) VALUES(?, ?, ?, 'PENDING')";
+    public List<User> getAllUsers() {
+        List<User> users = new ArrayList<>();
+        String sql = "SELECT id, username, password, roles, status FROM users";
         try (Connection conn = DatabaseConnection.getConnection();
-             PreparedStatement pstmt = conn.prepareStatement(sql)) {
-            pstmt.setString(1, username);
-            pstmt.setString(2, password);
-            pstmt.setString(3, role.toUpperCase());
-            pstmt.executeUpdate();
-            System.out.println("-> Successful Registration! Status: PENDING (Awaiting Admin Approval)");
-            return true;
-        } catch (SQLException e) {
-            System.err.println("Registration Failed: " + e.getMessage());
-            return false;
-        }
-    }
-
-    public User loginUser(String username, String password) {
-        String sql = "SELECT * FROM users WHERE username = ? AND password = ?";
-        try (Connection conn = DatabaseConnection.getConnection();
-             PreparedStatement pstmt = conn.prepareStatement(sql)) {
-            pstmt.setString(1, username);
-            pstmt.setString(2, password);
-            ResultSet rs = pstmt.executeQuery();
-
-            if (rs.next()) {
-                return new User(
+             Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery(sql)) {
+            while (rs.next()) {
+                users.add(new User(
                         rs.getInt("id"),
                         rs.getString("username"),
                         rs.getString("password"),
                         rs.getString("roles"),
                         rs.getString("status")
-                );
+                ));
             }
         } catch (SQLException e) {
-            System.err.println("Login Error: " + e.getMessage());
+            System.err.println("Error fetching all users: " + e.getMessage());
         }
-        return null;
+        return users;
     }
 
     public List<User> getPendingUsers() {
-        List<User> list = new ArrayList<>();
-        String sql = "SELECT * FROM users WHERE status = 'PENDING'";
+        List<User> users = new ArrayList<>();
+        String sql = "SELECT id, username, password, roles, status FROM users WHERE status = 'PENDING'";
         try (Connection conn = DatabaseConnection.getConnection();
              Statement stmt = conn.createStatement();
              ResultSet rs = stmt.executeQuery(sql)) {
             while (rs.next()) {
-                list.add(new User(
+                users.add(new User(
                         rs.getInt("id"),
                         rs.getString("username"),
                         rs.getString("password"),
@@ -64,65 +46,56 @@ public class UserDao {
         } catch (SQLException e) {
             System.err.println("Error fetching pending users: " + e.getMessage());
         }
-        return list;
+        return users;
     }
 
-    // Fetch all active Drivers and Conductors
-    public List<User> getStaffUsers() {
-        List<User> list = new ArrayList<>();
-        String sql = "SELECT * FROM users WHERE roles IN ('DRIVER', 'CONDUCTOR')";
+    public boolean approveUser(int userId) {
+        String sql = "UPDATE users SET status = 'APPROVED' WHERE id = ?";
         try (Connection conn = DatabaseConnection.getConnection();
-             Statement stmt = conn.createStatement();
-             ResultSet rs = stmt.executeQuery(sql)) {
-            while (rs.next()) {
-                list.add(new User(
-                        rs.getInt("id"),
-                        rs.getString("username"),
-                        rs.getString("password"),
-                        rs.getString("roles"),
-                        rs.getString("status")
-                ));
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setInt(1, userId);
+            int rowsUpdated = pstmt.executeUpdate();
+            return rowsUpdated > 0;
+        } catch (SQLException e) {
+            System.err.println("Error approving user: " + e.getMessage());
+            return false;
+        }
+    }
+
+    public User loginUser(String username, String password) {
+        String sql = "SELECT id, username, password, roles, status FROM users WHERE username = ? AND password = ?";
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setString(1, username);
+            pstmt.setString(2, password);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) {
+                    return new User(
+                            rs.getInt("id"),
+                            rs.getString("username"),
+                            rs.getString("password"),
+                            rs.getString("roles"),
+                            rs.getString("status")
+                    );
+                }
             }
         } catch (SQLException e) {
-            System.err.println("Error fetching staff users: " + e.getMessage());
+            System.err.println("Login error: " + e.getMessage());
         }
-        return list;
+        return null;
     }
 
-    public boolean updateUserStatus(int userId, String status) {
-        String sql = "UPDATE users SET status = ? WHERE id = ?";
+    public boolean registerUser(String username, String password, String role) {
+        String sql = "INSERT INTO users (username, password, roles, status) VALUES (?, ?, ?, 'PENDING')";
         try (Connection conn = DatabaseConnection.getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
-            pstmt.setString(1, status.toUpperCase());
-            pstmt.setInt(2, userId);
-            return pstmt.executeUpdate() > 0;
+            pstmt.setString(1, username);
+            pstmt.setString(2, password);
+            pstmt.setString(3, role);
+            pstmt.executeUpdate();
+            return true;
         } catch (SQLException e) {
-            System.err.println("Error updating status: " + e.getMessage());
-            return false;
-        }
-    }
-
-    public boolean deleteUser(int userId) {
-        String sql = "DELETE FROM users WHERE id = ? AND status = 'PENDING'";
-        try (Connection conn = DatabaseConnection.getConnection();
-             PreparedStatement pstmt = conn.prepareStatement(sql)) {
-            pstmt.setInt(1, userId);
-            return pstmt.executeUpdate() > 0;
-        } catch (SQLException e) {
-            System.err.println("Error deleting user: " + e.getMessage());
-            return false;
-        }
-    }
-
-    // Delete an existing Driver or Conductor account by ID
-    public boolean deleteStaffUser(int userId) {
-        String sql = "DELETE FROM users WHERE id = ? AND roles IN ('DRIVER', 'CONDUCTOR')";
-        try (Connection conn = DatabaseConnection.getConnection();
-             PreparedStatement pstmt = conn.prepareStatement(sql)) {
-            pstmt.setInt(1, userId);
-            return pstmt.executeUpdate() > 0;
-        } catch (SQLException e) {
-            System.err.println("Error deleting staff user: " + e.getMessage());
+            System.err.println("Registration error: " + e.getMessage());
             return false;
         }
     }
