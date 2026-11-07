@@ -62,6 +62,34 @@ public class UserDao {
         }
     }
 
+    public boolean updateUserRoleAndStatus(int userId, String newRole, String newStatus) {
+        String sql = "UPDATE users SET roles = ?, status = ? WHERE id = ?";
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setString(1, newRole.toUpperCase());
+            pstmt.setString(2, newStatus.toUpperCase());
+            pstmt.setInt(3, userId);
+            int rowsUpdated = pstmt.executeUpdate();
+            return rowsUpdated > 0;
+        } catch (SQLException e) {
+            System.err.println("Error updating user role and status: " + e.getMessage());
+            return false;
+        }
+    }
+
+    public boolean deleteUser(int userId) {
+        String sql = "DELETE FROM users WHERE id = ?";
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setInt(1, userId);
+            int rowsAffected = pstmt.executeUpdate();
+            return rowsAffected > 0;
+        } catch (SQLException e) {
+            System.err.println("Error deleting user: " + e.getMessage());
+            return false;
+        }
+    }
+
     public User loginUser(String username, String password) {
         String sql = "SELECT id, username, password, roles, status FROM users WHERE username = ? AND password = ?";
         try (Connection conn = DatabaseConnection.getConnection();

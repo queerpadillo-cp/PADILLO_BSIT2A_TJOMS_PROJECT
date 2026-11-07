@@ -75,7 +75,7 @@ public class Authentication {
     private void routeUser(User account) {
         String role = account.roles().toUpperCase();
         if (role.equals("ADMIN") || role.equals("ADMINISTRATOR")) {
-            AdminMenu adminMenu = new AdminMenu(userDao, scanner);
+            AdminMenu adminMenu = new AdminMenu(userDao, scanner, account); // Passes active admin account for self-edit check
             adminMenu.displayMenu();
         } else if (role.equals("CONDUCTOR")) {
             System.out.println("[INFO] Conductor dashboard active.");
