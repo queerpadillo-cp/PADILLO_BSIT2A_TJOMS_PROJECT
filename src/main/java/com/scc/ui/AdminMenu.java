@@ -1,17 +1,21 @@
 package com.scc.ui;
 
+import com.scc.dao.ActivityLogDao;
 import com.scc.dao.UserDao;
+import com.scc.model.ActivityLog;
 import com.scc.model.User;
 import java.util.List;
 import java.util.Scanner;
 
 public class AdminMenu {
     private final UserDao userDao;
+    private final ActivityLogDao activityLogDao;
     private final Scanner scanner;
     private final User currentAdmin;
 
-    public AdminMenu(UserDao userDao, Scanner scanner, User currentAdmin) {
+    public AdminMenu(UserDao userDao, ActivityLogDao activityLogDao, Scanner scanner, User currentAdmin) {
         this.userDao = userDao;
+        this.activityLogDao = activityLogDao;
         this.scanner = scanner;
         this.currentAdmin = currentAdmin;
     }
@@ -24,8 +28,9 @@ public class AdminMenu {
             System.out.println("3. Approve User Account");
             System.out.println("4. Update User Role & Status");
             System.out.println("5. Delete User Account");
-            System.out.println("6. Logout / Return to Main Menu");
-            System.out.print("Select option (1-6): ");
+            System.out.println("6. View System Audit Logs");
+            System.out.println("7. Logout / Return to Main Menu");
+            System.out.print("Select option (1-7): ");
             String choice = scanner.nextLine().trim();
 
             switch (choice) {
@@ -34,7 +39,8 @@ public class AdminMenu {
                 case "3" -> approveUserAccount();
                 case "4" -> updateUserRoleAndStatus();
                 case "5" -> deleteUserAccount();
-                case "6" -> {
+                case "6" -> viewAuditLogsMenu();
+                case "7" -> {
                     System.out.println("[LOGOUT] Returning to main menu.");
                     return;
                 }
@@ -76,6 +82,12 @@ public class AdminMenu {
         boolean success = userDao.approveUser(userId);
         if (success) {
             System.out.printf("[SUCCESS] User ID %d status updated from PENDING to APPROVED!\n", userId);
+            // Auto Log Action
+            activityLogDao.logAction(
+                    currentAdmin.id(),
+                    "USER_APPROVED",
+                    String.format("Admin %s (ID %d) approved account for User ID %d", currentAdmin.username(), currentAdmin.id(), userId)
+            );
         } else {
             System.out.println("[!] Failed to update user status in the database.");
         }
@@ -95,7 +107,6 @@ public class AdminMenu {
             return;
         }
 
-        // Self-Edit Restriction Guardrail
         if (targetUserId == currentAdmin.id()) {
             System.out.println("WARNING: Modifying the currently active admin account is restricted.");
             return;
@@ -122,6 +133,12 @@ public class AdminMenu {
         boolean success = userDao.updateUserRoleAndStatus(targetUserId, newRole, newStatus);
         if (success) {
             System.out.printf("[SUCCESS] User ID %d updated successfully! Role: %s, Status: %s\n", targetUserId, newRole, newStatus);
+            // Auto Log Action
+            activityLogDao.logAction(
+                    currentAdmin.id(),
+                    "USER_UPDATED",
+                    String.format("Admin %s (ID %d) changed role of User %d to %s and status to %s", currentAdmin.username(), currentAdmin.id(), targetUserId, newRole, newStatus)
+            );
         } else {
             System.out.println("[!] Failed to update user in the database.");
         }
@@ -141,7 +158,6 @@ public class AdminMenu {
             return;
         }
 
-        // Self-Deletion Restriction Guardrail
         if (targetUserId == currentAdmin.id()) {
             System.out.println("[!] WARNING: Deleting the currently active admin account is restricted.");
             return;
@@ -153,7 +169,6 @@ public class AdminMenu {
             return;
         }
 
-        // Confirmation Prompt
         System.out.print("Are you sure you want to permanently delete User ID " + targetUserId + "? (Y/N): ");
         String confirm = scanner.nextLine().trim().toUpperCase();
         if (!confirm.equals("Y")) {
@@ -164,12 +179,85 @@ public class AdminMenu {
         boolean success = userDao.deleteUser(targetUserId);
         if (success) {
             System.out.printf("[SUCCESS] User ID %d has been permanently deleted from the database.\n", targetUserId);
+            // Auto Log Action
+            activityLogDao.logAction(
+                    currentAdmin.id(),
+                    "USER_DELETED",
+                    String.format("Admin %s (ID %d) deleted User ID %d", currentAdmin.username(), currentAdmin.id(), targetUserId)
+            );
         } else {
             System.out.println("[!] Failed to delete user from the database.");
         }
     }
 
-    // Input Validation Wrappers
+    private void viewAuditLogsMenu() {
+        while (true) {
+            System.out.println("\n--- SYSTEM AUDIT LOG INTERFACE ---");
+            System.out.println("1. View All System Logs");
+            System.out.println("2. Filter Logs by User ID");
+            System.out.println("3. Clear Historical Logs");
+            System.out.println("4. Return to Admin Menu");
+            System.out.print("Select option (1-4): ");
+            String choice = scanner.nextLine().trim();
+
+            switch (choice) {
+                case "1" -> {
+                    List<ActivityLog> logs = activityLogDao.getAllLogs();
+                    printAuditLogTable(logs, "ALL SYSTEM AUDIT LOGS");
+                }
+                case "2" -> {
+                    int targetUserId = readIntInput("Enter User ID to filter logs (Enter 0 to cancel): ");
+                    if (targetUserId != 0) {
+                        List<ActivityLog> userLogs = activityLogDao.getLogsByUserId(targetUserId);
+                        printAuditLogTable(userLogs, "AUDIT LOGS FOR USER ID: " + targetUserId);
+                    }
+                }
+                case "3" -> {
+                    System.out.print("Are you sure you want to clear ALL historical logs? (Y/N): ");
+                    String confirm = scanner.nextLine().trim().toUpperCase();
+                    if (confirm.equals("Y")) {
+                        boolean cleared = activityLogDao.clearAllLogs();
+                        if (cleared) {
+                            System.out.println("[SUCCESS] Historical audit logs cleared successfully.");
+                            activityLogDao.logAction(currentAdmin.id(), "LOGS_CLEARED", "Admin cleared historical logs.");
+                        } else {
+                            System.out.println("[!] Failed to clear audit logs.");
+                        }
+                    } else {
+                        System.out.println("[INFO] Clear logs action cancelled.");
+                    }
+                }
+                case "4" -> {
+                    return;
+                }
+                default -> System.out.println("[!] Invalid choice!");
+            }
+        }
+    }
+
+    private void printAuditLogTable(List<ActivityLog> logs, String title) {
+        System.out.println("\n=========================================================================================================");
+        System.out.println(" " + title);
+        System.out.println("=========================================================================================================");
+        if (logs.isEmpty()) {
+            System.out.println(" (No audit log records found)");
+            System.out.println("=========================================================================================================");
+            return;
+        }
+
+        String format = "| %-5s | %-8s | %-18s | %-40s | %-20s |\n";
+        String border = "+-------+----------+--------------------+------------------------------------------+----------------------+";
+
+        System.out.println(border);
+        System.out.printf(format, "ID", "USER_ID", "ACTION_TYPE", "DESCRIPTION", "TIMESTAMP");
+        System.out.println(border);
+
+        for (ActivityLog log : logs) {
+            System.out.printf(format, log.id(), log.userId(), log.actionType(), log.description(), log.timestamp());
+        }
+        System.out.println(border);
+    }
+
     private int readIntInput(String prompt) {
         while (true) {
             System.out.print(prompt);
@@ -177,7 +265,7 @@ public class AdminMenu {
             try {
                 return Integer.parseInt(input);
             } catch (NumberFormatException e) {
-                System.out.println("[!] Invalid input. Please enter a valid numeric integer (letters/symbols are not allowed).");
+                System.out.println("[!] Invalid input. Please enter a valid numeric integer.");
             }
         }
     }

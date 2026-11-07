@@ -7,14 +7,13 @@ import java.util.Scanner;
 
 public class Main {
     public static void main(String[] args) {
-        // 1. Initialize Database & Tables
-        DatabaseInitializer.initializeTables();
+        // Automatically initialize database and tables on startup
+        DatabaseInitializer.initializeDatabase();
 
-        // 2. Instantiate DAOs & Shared Scanner
-        UserDao userDao = new UserDao();
         Scanner scanner = new Scanner(System.in);
+        UserDao userDao = new UserDao();
 
-        // 3. Delegate execution to Authentication UI handler
+        // Start the application authentication and routing menu
         Authentication auth = new Authentication(userDao, scanner);
         auth.start();
 

@@ -1,5 +1,6 @@
 package com.scc.ui;
 
+import com.scc.dao.ActivityLogDao;
 import com.scc.dao.UserDao;
 import com.scc.model.User;
 import java.util.Scanner;
@@ -75,7 +76,8 @@ public class Authentication {
     private void routeUser(User account) {
         String role = account.roles().toUpperCase();
         if (role.equals("ADMIN") || role.equals("ADMINISTRATOR")) {
-            AdminMenu adminMenu = new AdminMenu(userDao, scanner, account); // Passes active admin account for self-edit check
+            ActivityLogDao activityLogDao = new ActivityLogDao();
+            AdminMenu adminMenu = new AdminMenu(userDao, activityLogDao, scanner, account);
             adminMenu.displayMenu();
         } else if (role.equals("CONDUCTOR")) {
             System.out.println("[INFO] Conductor dashboard active.");
